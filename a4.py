@@ -114,3 +114,17 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+Output:
+Baseline accuracy: 0.9667
+Decision Tree accuracy: 0.9667
+KNN accuracy for k=1: 0.9667
+KNN accuracy for k=3: 0.9667
+KNN accuracy for k=5: 0.9667
+KNN accuracy for k=7: 0.9667
+
+Cross-validation results:
+Average KNN accuracy for k=1: 0.9667
+Average KNN accuracy for k=3: 0.9667
+Average KNN accuracy for k=5: 0.9667
+Average KNN accuracy for k=7: 0.9667

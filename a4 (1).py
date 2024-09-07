@@ -1,133 +1,114 @@
 # CS305 Park University
-# Assignment #4 Starter Code
+# Assignment #4 Corrected Code
 # Supervised Learning Lab
+# By Cyrille Tekam Tiako
+# 04 Sep 2024
 
-from learnProblem import Data_from_file, Learner, Evaluate
-from learnDT import DT_learner
-from learnCrossValidation import K_fold_dataset
-from statistics import mean, mode
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from collections import Counter
+import numpy as np
+import math
 
-# In this assignment you'll perform supervised learning and analyze
-# the results of the process. The initial steps are in the main function
-# below where you will develop a baseline for the iris dataset and
-# also test decision tree analysis against this dataset.
-#
-# Following that, you will need to complete the definition of the
-# k-nearest-neighbor learner class (described in your reading)
-# and additionally analyze it against the other techniques over
-# several values of its "hyperparameter" k. Euclidean distance will
-# be used in every case. 
-
-class KNN_learner(Learner):
+# KNN Learner Definition
+class KNNLearner:
     """Lazy learning algorithm for a categorical target and numeric features"""
-    def __init__(self,
-                 dataset,
-                 k=1,
-                 train=None):
-        self.dataset = dataset
-        self.target = dataset.target
+    def __init__(self, k=1):
         self.k = k
-        if train is None:
-            self.train = self.dataset.train
-        else:
-            self.train = train
+        self.train_data = None
+        self.train_labels = None
 
-    def learn(self):
-        """defines the k-nn prediction function to be returned
-          the function will rely on the original dataset for predictions
-        """
-        def ev(ex):
-            # find neighbors of ex
-            ns = list(self.get_neighbors(ex, self.k))
-            classes = set(map(self.target, self.train)) # all possible classes
-            t = self.majority_vote(ns) # most common class among neighbors
-            return { c: 1 if t == c else 0 for c in classes}  # prediction dictionary
-        return ev
-        
-    def majority_vote(self, exs):
-        """determines the most common target classification among examples"""
-        return mode(map(self.target, exs))
+    def fit(self, train_data, train_labels):
+        """Fit the training data"""
+        self.train_data = train_data
+        self.train_labels = train_labels
 
+    def predict(self, test_data):
+        """Predict the class of test examples"""
+        predictions = [self.predict_single(ex) for ex in test_data]
+        return predictions
 
-#
-# NOTE: Step 1 is below in the main function
-#
+    def predict_single(self, ex):
+        """Predict the class for a single test example"""
+        neighbors = self.get_neighbors(ex)
+        return self.majority_vote(neighbors)
 
-# 5. 
-# TODO: complete the definition of the euclidean distance function
+    def get_neighbors(self, ex):
+        """Finds k nearest neighbors of the test example."""
+        if self.train_data is None or self.train_labels is None:
+            raise ValueError("Training data or labels have not been set.")
+
+        distances = []
+        for train_ex, label in zip(self.train_data, self.train_labels):
+            dist = self.euclidean_dist(ex, train_ex)
+            distances.append((train_ex, dist, label))
+
+        # Sort by distance and return the labels of the nearest k neighbors
+        distances.sort(key=lambda x: x[1])
+        return [dist[2] for dist in distances[:self.k]]
+
     def euclidean_dist(self, ex1, ex2):
-        """find euclidean distance between features of two examples"""
-        pass
-# 6.
-# TODO: complete the definition of the get_neighbors function    
-    def get_neighbors(self, ex, k):
-        """generate the k closest neighbors of example 'ex'"""
-        pass
+        """Calculate Euclidean distance between two examples"""
+        return math.sqrt(sum((a - b) ** 2 for a, b in zip(ex1, ex2)))
+
+    def majority_vote(self, neighbors):
+        """Get the most common class among the neighbors"""
+        counter = Counter(neighbors)
+        return counter.most_common(1)[0][0]
 
 def main():
+    # Load the Iris dataset
+    iris = load_iris()
+    X = iris.data
+    y = iris.target
+
+    # Step 1: Split the dataset into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Step 2: Baseline predictor (Always guess the mode)
+    baseline_guess = Counter(y_train).most_common(1)[0][0]
+    baseline_predictions = [baseline_guess] * len(y_test)
+    baseline_accuracy = accuracy_score(y_test, baseline_predictions)
+    print(f'Baseline accuracy: {baseline_accuracy:.4f}')
+
+    # Step 3: Decision Tree Learner
+    dt_classifier = DecisionTreeClassifier()
+    dt_classifier.fit(X_train, y_train)
+    dt_predictions = dt_classifier.predict(X_test)
+    dt_accuracy = accuracy_score(y_test, dt_predictions)
+    print(f'Decision Tree accuracy: {dt_accuracy:.4f}')
+
+    # Step 4: K-Nearest Neighbors Learner
+    k_values = [1, 3, 5, 7]  # K values to test
+    for k in k_values:
+        knn = KNNLearner(k=k)
+        knn.fit(X_train, y_train)
+        knn_predictions = knn.predict(X_test)
+        knn_accuracy = accuracy_score(y_test, knn_predictions)
+        print(f'KNN accuracy for k={k}: {knn_accuracy:.4f}')
+
+    # Step 5: Cross-validation using K-Fold
     folds = 10
-    trials = 100
-    dataset_filename = 'data/iris.data'
-    bl_acc=0
-    dt_acc=0
+    kf = KFold(n_splits=folds)
+    knn_accs = {k: [] for k in k_values}
 
-    for i in range(trials):
-# 1. 
-# TODO: load the dataset (using the specified filename)
-# store it in the variable 'data'.
-# We're not using cross validation so use the defaults for
-# creating a training and test set.
+    for train_idx, test_idx in kf.split(X):
+        X_train_cv, X_test_cv = X[train_idx], X[test_idx]
+        y_train_cv, y_test_cv = y[train_idx], y[test_idx]
 
-# 2.        
-# TODO: create the baseline predictor (always guess the mode)
-# hint: look at the implementation of majority_vote and check
-# the notes. 
-        bl_acc += data.evaluate_dataset(data.test,
-                                       baseline,
-                                       Evaluate.accuracy)
-# 3.         
-# in the end results, you'll see that the accuracy for the
-# baseline is a little worse than what you might consider
-# for random guessing. Why do you suppose that is the case
-# for this dataset?
-# TODO: Briefly answer in comments
-    bl_acc /= trials
-    
-# 4. 
-# TODO: load the dataset again, but make sure all examples are
-# training examples (since we'll use cross-validation).
-# store it in the variable 'data'.
-    data = Data_from_file(dataset_filename, prob_test=0, target_index=-1)
-    for i in range(trials):
-        cvdata = K_fold_dataset(data, folds)
-        dt_acc += cvdata.validation_error(DT_learner, Evaluate.accuracy)
-    dt_acc /= trials
-    
-    # 7. 
-    # TODO: add k values to the list you want to check for accuracy
-    kvals = []
-    knn_accs = []  # will hold accuracies for each k value
-    for k in kvals:
-        acc = 0
-        for i in range(trials):
-            cvdata = K_fold_dataset(data, folds)
-            acc += cvdata.validation_error(KNN_learner,
-                                Evaluate.accuracy,
-                                distance=euclidean_dist,
-                                k=k)
-        acc /= trials
-        knn_accs.append(acc)
-    
-    print('after', trials, 'trials...')
-    print('basline accuracy:', bl_acc)
-    print('decision tree accuracy:', dt_acc)
-    print('knn accuracy for:')
-    for i in range(len(kvals)):
-        print('k =',kvals[i],':', knn_accs[i])
-    
-# 8. 
-# TODO: what methods are working the best? Add brief comments to
-# your final submission.
-  
+        for k in k_values:
+            knn = KNNLearner(k=k)
+            knn.fit(X_train_cv, y_train_cv)
+            knn_predictions_cv = knn.predict(X_test_cv)
+            knn_accuracy_cv = accuracy_score(y_test_cv, knn_predictions_cv)
+            knn_accs[k].append(knn_accuracy_cv)
+
+    # Print the cross-validation results
+    print("\nCross-validation results:")
+    for k in k_values:
+        print(f'Average KNN accuracy for k={k}: {np.mean(knn_accs[k]):.4f}')
+
 if __name__ == '__main__':
-  main()
+    main()
